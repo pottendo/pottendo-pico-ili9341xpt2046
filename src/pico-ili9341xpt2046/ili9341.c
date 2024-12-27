@@ -18,6 +18,8 @@
 
  */
 
+/* add this to your program, to mapt the pins to your wiring 
+
 ili9341_config_t ili9341_config = {
 	.port = spi1,
 	.pin_miso = 11,
@@ -28,6 +30,9 @@ ili9341_config_t ili9341_config = {
 	.pin_dc = 4,
     .pin_led = 14
 };
+*/
+
+int __spi_busy =0;
 
 static inline void cs_select() {
     asm volatile("nop \n nop \n nop");

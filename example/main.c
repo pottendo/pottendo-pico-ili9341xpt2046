@@ -6,11 +6,22 @@
 
 #include "pico/stdlib.h"
 #include <stdbool.h>
-#include "ili9341.h"
-#include "ili9341_framebuffer.h"
-#include "ili9341_draw.h"
-#include "xpt2046.h"
-#include "ugui.h"
+#include "pico-ili9341xpt2046/ili9341.h"
+#include "pico-ili9341xpt2046/ili9341_framebuffer.h"
+#include "pico-ili9341xpt2046/ili9341_draw.h"
+#include "pico-ili9341xpt2046/xpt2046.h"
+#include "pico-ili9341xpt2046/ugui.h"
+
+ili9341_config_t ili9341_config = {
+	.port = spi1,
+	.pin_miso = 11,
+	.pin_cs = 13,
+	.pin_sck = 10,
+	.pin_mosi = 12,
+	.pin_reset = 15,
+	.pin_dc = 14,
+    .pin_led = 8
+};
 
 #define LED_PIN 25
 
@@ -67,28 +78,68 @@ UG_RESULT _HW_FillFrame(UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_COLOR rgb
     return UG_RESULT_OK;
 }
 
-void window_1_callback( UG_MESSAGE* msg )
+/* Pico W devices use a GPIO on the WIFI chip for the LED,
+   so when building for Pico W, CYW43_WL_GPIO_LED_PIN will be defined */
+#ifdef CYW43_WL_GPIO_LED_PIN
+#include "pico/cyw43_arch.h"
+#endif
+
+#ifndef LED_DELAY_MS
+#define LED_DELAY_MS 250
+#endif
+
+/* Perform initialisation */
+int pico_led_init(void) {
+#if defined(PICO_DEFAULT_LED_PIN)
+    // A device like Pico that uses a GPIO for the LED will define PICO_DEFAULT_LED_PIN
+    // so we can use normal GPIO functionality to turn the led on and off
+    gpio_init(PICO_DEFAULT_LED_PIN);
+    gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
+    return PICO_OK;
+#elif defined(CYW43_WL_GPIO_LED_PIN)
+    // For Pico W devices we need to initialise the driver etc
+    return cyw43_arch_init();
+#endif
+}
+
+// Turn the led on or off
+void pico_set_led(bool led_on)
 {
-   if ( msg->type == MSG_TYPE_OBJECT )
-   {
-      if ( msg->id == OBJ_TYPE_BUTTON )
-      {
-         switch( msg->sub_id )
-         {
+#if defined(PICO_DEFAULT_LED_PIN)
+    // Just set the GPIO on or off
+    gpio_put(PICO_DEFAULT_LED_PIN, led_on);
+#elif defined(CYW43_WL_GPIO_LED_PIN)
+    // Ask the wifi "driver" to set the GPIO on or off
+    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, led_on);
+#endif
+}
+
+void window_1_callback(UG_MESSAGE *msg)
+{
+    pico_set_led(true);
+    sleep_ms(50);
+    pico_set_led(false);
+    if (msg->type == MSG_TYPE_OBJECT)
+    {
+        if (msg->id == OBJ_TYPE_BUTTON)
+        {
+            switch (msg->sub_id)
+            {
             case BTN_ID_0: // Toggle green LED
             {
-               button_green_click();
-               break;
+                button_green_click();
+                break;
             }
             case BTN_ID_1: // Toggle red LED
             {
-               button_red_click();
-               break;
+                button_red_click();
+                break;
             }
-            default : break;
-         }
-      }
-   }
+            default:
+                break;
+            }
+        }
+    }
 }
 
 void button_green_click(void)
@@ -96,11 +147,11 @@ void button_green_click(void)
     static bool state = false;
     state = !state;
     if (state) {
-        gpio_put(LED_PIN,1);
-        UG_ButtonSetText(&window_1, BTN_ID_0, "ON");
+        pico_set_led(true);
+        UG_ButtonSetText(&window_1, BTN_ID_0, "An");
     } else {
-        gpio_put(LED_PIN,0);
-        UG_ButtonSetText(&window_1, BTN_ID_0, "OFF");
+        pico_set_led(false);
+        UG_ButtonSetText(&window_1, BTN_ID_0, "Aus");
     }
 }
 
@@ -109,16 +160,13 @@ void button_red_click(void)
     static bool state = false;
     state = !state;
     if (state) {
-        gpio_put(LED_PIN,1);
+        pico_set_led(true);
         UG_ButtonSetText(&window_1, BTN_ID_1, "ON");
     } else {
-        gpio_put(LED_PIN,0);
+        pico_set_led(false);
         UG_ButtonSetText(&window_1, BTN_ID_1, "OFF");
     }
 }
-
-
-
 
 bool timer_ts_poll_callback(struct repeating_timer *t)
 {
@@ -126,7 +174,7 @@ bool timer_ts_poll_callback(struct repeating_timer *t)
         uint16_t x = ts_get_x();
         uint16_t y = ts_get_y();
         if ((x > 0 && x < 239) && (y > 0 && y < 319)) {
-            UG_TouchUpdate(x, y, TOUCH_STATE_PRESSED);
+            UG_TouchUpdate(240 - x, 320 - y, TOUCH_STATE_PRESSED);  /* Fixme for rotation */
         }
     } else {
         UG_TouchUpdate(-1, -1, TOUCH_STATE_RELEASED);
@@ -136,13 +184,19 @@ bool timer_ts_poll_callback(struct repeating_timer *t)
 }
 
 
-int main() {
+int main() 
+{
+    stdio_init_all();
+    int rc = pico_led_init();
+    hard_assert(rc == PICO_OK);
+    pico_set_led(true);
+    sleep_ms(LED_DELAY_MS);
+    pico_set_led(false);
 
     ili9341_init();
     ts_spi_setup();
     gpio_init(LED_PIN);
     gpio_set_dir(LED_PIN,GPIO_OUT);
-
 
     fill_screen(0x0000);
     struct repeating_timer timer;
@@ -164,7 +218,7 @@ int main() {
     UG_ButtonCreate( &window_1, &button1_1, BTN_ID_0, 10, 10, 110, 60 );
     UG_ButtonSetFont( &window_1, BTN_ID_0, &FONT_12X20 );
     UG_ButtonSetBackColor( &window_1, BTN_ID_0, C_LIME );
-    UG_ButtonSetText( &window_1, BTN_ID_0, "OFF" );
+    UG_ButtonSetText( &window_1, BTN_ID_0, "Aus" );
 
     UG_ButtonCreate( &window_1, &button1_2, BTN_ID_1, 10, 80, 110, 130 );
     UG_ButtonSetFont( &window_1, BTN_ID_1, &FONT_12X20 );

@@ -4,13 +4,21 @@
 #ifndef XPT2046_H_XYZ
 #define XPT2046_H_XYZ
 
+/* originals 
 #define TS_SPI          spi0
 #define TS_MO_PIN       7
 #define TS_MI_PIN       0
 #define TS_SCL_PIN      6
 #define TS_CS_PIN       9
 #define TS_IRQ_PIN      15
+*/
 
+#define TS_SPI          spi1
+#define TS_MO_PIN       12 // 7
+#define TS_MI_PIN       11 // 0
+#define TS_SCL_PIN      10 //6
+#define TS_CS_PIN       9
+#define TS_IRQ_PIN      7 //15
 
 #define TS_SB       (1 << 7)
 #define TS_A2       (1 << 6)

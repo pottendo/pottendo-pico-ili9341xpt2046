@@ -2,14 +2,15 @@
 /* Author, Copyright: Oleg Borodin <onborodin@gmail.com> 2018 */
 
 #include <stdlib.h>
-
+#include <stdio.h>
 
 #include "pico/stdlib.h"
 #include "ili9341.h"
 #include "xpt2046.h"
 
-void ts_spi_setup(void) {
-
+void ts_spi_setup(void) 
+{
+#if 0
     spi_init(TS_SPI, 100 * 1000);
     int baudrate = spi_set_baudrate(TS_SPI, 50 * 1000);
 
@@ -17,6 +18,7 @@ void ts_spi_setup(void) {
     gpio_set_function(TS_MO_PIN, GPIO_FUNC_SPI);
     gpio_set_function(TS_MI_PIN, GPIO_FUNC_SPI);
     gpio_set_function(TS_SCL_PIN, GPIO_FUNC_SPI);
+#endif
 
     gpio_init(TS_CS_PIN);
     gpio_set_dir(TS_CS_PIN, GPIO_OUT);
@@ -26,9 +28,12 @@ void ts_spi_setup(void) {
     gpio_set_dir(TS_IRQ_PIN, GPIO_IN);
 }
 
-
+extern int __spi_busy;
 
 uint16_t ts_get_data16(uint8_t command) {
+    if (__spi_busy)
+        printf("%s: busy...\n", __FUNCTION__);
+    spi_set_baudrate(TS_SPI, 50 * 1000);
     gpio_put(TS_CS_PIN,0);
     spi_write_blocking(TS_SPI, &command, 1);
     uint16_t res1,res2;
@@ -37,10 +42,10 @@ uint16_t ts_get_data16(uint8_t command) {
     spi_read_blocking(TS_SPI, 0x00, &b1, 1);
     spi_read_blocking(TS_SPI, 0x00, &b2, 1);
     gpio_put(TS_CS_PIN,1);
+    spi_set_baudrate(TS_SPI, 75000 * 1000);
     res1 = b1; res2 = b2;
     return ((res1 << 8) | (res2 && 0xFF)) >> 4;
 }
-
 
 uint16_t ts_get_x_raw(void) {
     int16_t res = 0;
