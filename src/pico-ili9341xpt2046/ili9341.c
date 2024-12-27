@@ -35,6 +35,7 @@ ili9341_config_t ili9341_config = {
 int __spi_busy =0;
 
 static inline void cs_select() {
+    __spi_busy = 1;
     asm volatile("nop \n nop \n nop");
     gpio_put(ili9341_config.pin_cs, 0);  // Active low
     asm volatile("nop \n nop \n nop");
@@ -44,6 +45,7 @@ static inline void cs_deselect() {
     asm volatile("nop \n nop \n nop");
     gpio_put(ili9341_config.pin_cs, 1);
     asm volatile("nop \n nop \n nop");
+    __spi_busy = 0;
 }
 
 void ili9341_set_command(uint8_t cmd) {

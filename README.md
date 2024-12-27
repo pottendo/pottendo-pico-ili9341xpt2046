@@ -8,6 +8,7 @@ It uses just SPI1 from the pico, to keep SPI0 free for other applications.
 ## Todo
 - cleanup initialization: consistent way to configure pins
 - check SPI speed
+- Fix startup issue on IRQ pin
 
 ## Description
 

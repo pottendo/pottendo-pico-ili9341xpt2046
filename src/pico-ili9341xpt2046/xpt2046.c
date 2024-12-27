@@ -8,6 +8,18 @@
 #include "ili9341.h"
 #include "xpt2046.h"
 
+#if 0
+extern void pico_set_led(bool);
+void isr(uint gpio, uint32_t event_mask)
+{
+    if (event_mask & GPIO_IRQ_EDGE_FALL){
+        pico_set_led(true);
+    } else {
+        pico_set_led(false);
+    }
+}
+#endif
+
 void ts_spi_setup(void) 
 {
 #if 0
@@ -23,9 +35,9 @@ void ts_spi_setup(void)
     gpio_init(TS_CS_PIN);
     gpio_set_dir(TS_CS_PIN, GPIO_OUT);
     gpio_put(TS_CS_PIN, 0);
-
     gpio_init(TS_IRQ_PIN);
     gpio_set_dir(TS_IRQ_PIN, GPIO_IN);
+    // gpio_set_irq_enabled_with_callback (TS_IRQ_PIN, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, isr);
 }
 
 extern int __spi_busy;
